@@ -674,6 +674,46 @@
             leaderboardEl.appendChild(card);
         });
     });
+    // 🔴 RANK CRITERIA REALTIME LISTENER FOR MODAL
+    const rankModalBody = document.getElementById('modalChartBody');
+    const criteriaRef = ref(db, 'rankCriteria');
+
+    onValue(criteriaRef, (snapshot) => {
+        const criteria = snapshot.val();
+        if (!criteria || !rankModalBody) return;
+
+        // Custom points mapping from Admin Panel
+        const criteriaList = [
+            { name: '👑 Master Tier', score: criteria.master || 100, color: '#ff0055' },
+            { name: '💎 Diamond Tier', score: criteria.diamond || 80, color: '#06b6d4' },
+            { name: '🥇 Gold Tier', score: criteria.gold || 60, color: '#ffd700' },
+            { name: '🥈 Silver Tier', score: criteria.silver || 40, color: '#94a3b8' },
+            { name: '🥉 Bronze Tier', score: criteria.bronze || 20, color: '#cd7f32' }
+        ];
+
+        rankModalBody.innerHTML = '';
+        
+        criteriaList.forEach(item => {
+            const row = document.createElement('div');
+            row.style.cssText = `
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                padding: 12px 16px;
+                background: rgba(255, 255, 255, 0.03);
+                border: 1px solid rgba(255, 255, 255, 0.08);
+                border-radius: 12px;
+            `;
+            
+            row.innerHTML = `
+                <span style="font-weight: 800; color: ${item.color};">${item.name}</span>
+                <span style="font-weight: 800; color: #fff; background: rgba(255,255,255,0.1); padding: 4px 12px; border-radius: 20px;">
+                    ${item.score}+ Points
+                </span>
+            `;
+            rankModalBody.appendChild(row);
+        });
+    });
 </script>
 </body>
 </html>
