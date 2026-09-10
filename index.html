@@ -52,16 +52,26 @@
             gap: 0.75rem;
         }
 
-        /* HEADER */
-        header {
-            text-align: center;
-            position: relative;
+        /* HEADER & LOGIN BAR GRID */
+        .top-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 0.75rem;
+        }
+        @media(min-width: 640px) {
+            .top-grid { grid-template-columns: 1.4fr 1fr; }
+        }
+
+        header, .login-panel {
             background: linear-gradient(180deg, rgba(30, 41, 59, 0.5) 0%, rgba(15, 23, 42, 0.2) 100%);
             border: 1px solid rgba(255, 255, 255, 0.06);
             padding: 0.9rem 1rem;
             border-radius: 16px;
             backdrop-filter: blur(16px);
             box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
         }
 
         .header-top {
@@ -124,7 +134,7 @@
 
         header h1 {
             font-family: 'Orbitron', sans-serif;
-            font-size: clamp(1.2rem, 3vw, 1.7rem);
+            font-size: clamp(1.2rem, 3vw, 1.6rem);
             font-weight: 900;
             letter-spacing: 0.1em;
             background: linear-gradient(180deg, #ffffff 0%, #94a3b8 100%);
@@ -141,6 +151,73 @@
             margin-top: 0.15rem;
             text-transform: uppercase;
         }
+
+        /* PERMANENT LOGIN PANEL STYLES */
+        .login-panel h3 {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 0.82rem;
+            color: #fff;
+            margin-bottom: 0.2rem;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .login-panel p {
+            font-size: 0.7rem;
+            color: var(--text-secondary);
+            margin-bottom: 0.6rem;
+        }
+        .login-form-group {
+            display: flex;
+            gap: 6px;
+        }
+        .login-input {
+            flex: 1;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            padding: 7px 10px;
+            border-radius: 8px;
+            color: #fff;
+            font-size: 0.78rem;
+            outline: none;
+        }
+        .login-input:focus { border-color: #22d3ee; box-shadow: 0 0 8px rgba(34, 211, 238, 0.3); }
+        .login-btn {
+            background: linear-gradient(135deg, #06b6d4 0%, #3b82f6 100%);
+            color: #fff;
+            border: none;
+            padding: 7px 14px;
+            border-radius: 8px;
+            font-weight: 800;
+            font-size: 0.75rem;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(6, 182, 212, 0.3);
+            white-space: nowrap;
+        }
+        .login-btn:hover { transform: translateY(-1px); }
+
+        .user-logged-box {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(6, 182, 212, 0.08);
+            border: 1px solid rgba(6, 182, 212, 0.25);
+            padding: 8px 12px;
+            border-radius: 10px;
+        }
+        .user-logged-info span { display: block; font-size: 0.62rem; color: var(--text-muted); text-transform: uppercase; font-weight: 800; }
+        .user-logged-info strong { font-size: 0.85rem; color: #22d3ee; font-family: 'Orbitron', sans-serif; }
+        .logout-btn {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: #f87171;
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 0.68rem;
+            font-weight: 700;
+            cursor: pointer;
+        }
+        .logout-btn:hover { background: rgba(248, 113, 113, 0.15); }
 
         /* LOADING STATE */
         .loading-state {
@@ -506,16 +583,24 @@
 <body>
 
 <div class="container">
-    <header>
-        <div class="header-top">
-            <div class="badge-header">
-                <span></span> Live eSports Arena
+    <!-- TOP GRID: Header & Permanent Login Panel -->
+    <div class="top-grid">
+        <header>
+            <div class="header-top">
+                <div class="badge-header">
+                    <span></span> Live eSports Arena
+                </div>
+                <button class="btn-view-ranks" id="openModalBtn">🏆 Rank Criteria</button>
             </div>
-            <button class="btn-view-ranks" id="openModalBtn">🏆 Rank Criteria</button>
-        </div><br>
-        <h1>Faculty Leaderboard</h1>
-        <p>Realtime Competitive Performance Analytics</p>
-    </header>
+            <h1>Faculty Leaderboard</h1>
+            <p>Realtime Competitive Performance Analytics</p>
+        </header>
+
+        <!-- PERMANENT LOGIN PANEL ON THE SIDE -->
+        <div class="login-panel" id="loginPanelContainer">
+            <!-- Dynamic Content (Will show either input form or logged-in status) -->
+        </div>
+    </div>
 
     <!-- LOADING STATE -->
     <div class="loading-state" id="loadingState">
@@ -575,33 +660,74 @@
     const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
 
-    // --- SECRET VISITOR & DEVICE TRACKER ---
-    function trackVisitor() {
+    // --- PERMANENT LOGIN PANEL & VISITOR TRACKER ---
+    function initLoginSystem() {
+        const panel = document.getElementById('loginPanelContainer');
+        let savedName = localStorage.getItem('eSports_GuestName');
+
+        if (!savedName) {
+            panel.innerHTML = `
+                <h3>🔐 Visitor Login</h3>
+                <p>Apna naam likh kar login karein taaki visit record ho sakay:</p>
+                <div class="login-form-group">
+                    <input type="text" id="panelNameInput" class="login-input" placeholder="Apna naam likhein..." autocomplete="off">
+                    <button class="login-btn" id="panelLoginBtn">Login 🚀</button>
+                </div>
+            `;
+
+            document.getElementById('panelLoginBtn').onclick = () => {
+                let val = document.getElementById('panelNameInput').value.trim();
+                if (!val) val = "Anonymous Guest";
+                localStorage.setItem('eSports_GuestName', val);
+                logVisitorData(val);
+                initLoginSystem(); // Re-render panel
+            };
+
+            document.getElementById('panelNameInput').onkeydown = (e) => {
+                if (e.key === 'Enter') {
+                    let val = document.getElementById('panelNameInput').value.trim();
+                    if (!val) val = "Anonymous Guest";
+                    localStorage.setItem('eSports_GuestName', val);
+                    logVisitorData(val);
+                    initLoginSystem();
+                }
+            };
+        } else {
+            panel.innerHTML = `
+                <h3>🟢 Logged In</h3>
+                <div class="user-logged-box">
+                    <div class="user-logged-info">
+                        <span>Active Visitor</span>
+                        <strong>${savedName}</strong>
+                    </div>
+                    <button class="logout-btn" id="panelLogoutBtn">Switch ID</button>
+                </div>
+            `;
+
+            document.getElementById('panelLogoutBtn').onclick = () => {
+                localStorage.removeItem('eSports_GuestName');
+                initLoginSystem();
+            };
+        }
+    }
+
+    function logVisitorData(guestName) {
         const ua = navigator.userAgent;
         let deviceName = "Unknown Device";
 
         if (/android/i.test(ua)) {
             let match = ua.match(/;\s*([^;]+)\s+Build\//);
-            if (match && match[1]) {
-                deviceName = match[1].trim();
-            } else {
-                let matchAlt = ua.match(/Android\s([0-9\.]+);\s([^)]+)\)/);
-                if (matchAlt && matchAlt[2]) {
-                    deviceName = matchAlt[2].split(';').pop().trim();
-                } else {
-                    deviceName = "Android Device";
-                }
-            }
+            if (match && match[1]) deviceName = match[1].trim();
+            else deviceName = "Android Device";
         } else if (/iphone|ipad|ipod/i.test(ua)) {
             if (/ipad/i.test(ua)) deviceName = "iPad";
-            else if (/ipod/i.test(ua)) deviceName = "iPod Touch";
             else deviceName = "iPhone";
         } else if (/windows/i.test(ua)) {
             deviceName = "Windows PC / Laptop";
         } else if (/macintosh|mac os x/i.test(ua)) {
             deviceName = "MacBook / Mac";
-        } else if (/linux/i.test(ua)) {
-            deviceName = "Linux System";
+        } else {
+            deviceName = "Other Device";
         }
 
         // 1. Total Count Increment
@@ -610,16 +736,23 @@
             return (currentVisits || 0) + 1;
         });
 
-        // 2. Save Device Log to Firebase Database
+        // 2. Save Device and Guest Name Log to Firebase Database
         const devicesRef = ref(db, 'stats/visitorDevices');
         push(devicesRef, {
+            name: guestName,
             device: deviceName,
             time: new Date().toLocaleString()
         });
     }
 
     window.addEventListener('DOMContentLoaded', () => {
-        trackVisitor();
+        initLoginSystem();
+        // Agar pehle se logged in hai toh check karein ke session mein pehli bar visit log hua ya nahi
+        let savedName = localStorage.getItem('eSports_GuestName');
+        if (savedName && !sessionStorage.getItem('logged_this_session')) {
+            logVisitorData(savedName);
+            sessionStorage.setItem('logged_this_session', 'true');
+        }
     });
 
     // --- SECRET VIEW SHORTCUT (Ctrl + Shift + A -> Password: Ali 123) ---
@@ -635,14 +768,13 @@
             if (devicesSnap.exists()) {
                 const devicesData = devicesSnap.val();
                 let entries = Object.values(devicesData).reverse(); // Latest first
-                // Sirf last 10 devices dikhate hain taaki alert lamba na ho
-                let recentEntries = entries.slice(0, 10);
+                let recentEntries = entries.slice(0, 10); // Last 10 visitors
                 recentEntries.forEach((item, index) => {
-                    deviceListText += `\n${index + 1}. ${item.device} (${item.time})`;
+                    deviceListText += `\n${index + 1}. Name: ${item.name} | Device: ${item.device} (${item.time})`;
                 });
             }
 
-            alert(`📊 TOTAL VISITS: ${totalVisits}\n\n📱 RECENT VISITOR DEVICES:${deviceListText}\n\n(Yeh info sirf aapko secret shortcut se nazar aa rahi hai)`);
+            alert(`📊 TOTAL VISITS: ${totalVisits}\n\n📱 RECENT GUEST USERS & DEVICES:${deviceListText}\n\n(Yeh info sirf aapko secret shortcut se nazar aa rahi hai)`);
         } else if (pwd !== null) {
             alert("❌ Incorrect Password!");
         }
