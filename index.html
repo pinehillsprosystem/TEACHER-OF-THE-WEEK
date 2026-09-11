@@ -562,6 +562,41 @@
 
         .modal-body { padding: 1rem 1.2rem; overflow-y: auto; display: flex; flex-direction: column; gap: 0.5rem; }
 
+        /* ANALYTICS MODAL CUSTOM STYLES */
+        .admin-login-box {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            padding: 10px 0;
+        }
+        .analytics-stats-box {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        .stat-banner {
+            background: linear-gradient(135deg, rgba(6, 182, 212, 0.15), rgba(59, 130, 246, 0.15));
+            border: 1px solid rgba(6, 182, 212, 0.3);
+            border-radius: 12px;
+            padding: 12px;
+            text-align: center;
+        }
+        .stat-banner span { font-size: 0.65rem; color: var(--text-secondary); font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; display: block; }
+        .stat-banner strong { font-family: 'Orbitron', sans-serif; font-size: 1.5rem; color: #22d3ee; }
+        
+        .visitor-item {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            padding: 8px 10px;
+            border-radius: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.72rem;
+        }
+        .visitor-item strong { color: #f8fafc; font-weight: 800; }
+        .visitor-item span { color: var(--text-muted); font-size: 0.62rem; }
+
         .celebration-overlay { z-index: 2000; }
         .celebration-box {
             display: flex; flex-direction: column; align-items: center; text-align: center;
@@ -591,15 +626,13 @@
                     <span></span> Live eSports Arena
                 </div>
                 <button class="btn-view-ranks" id="openModalBtn">🏆 Rank Criteria</button>
-            </div><br>
-            <h1>TEACHER OF THE WEEK</h1>
+            </div>
+            <h1>Faculty Leaderboard</h1>
             <p>Realtime Competitive Performance Analytics</p>
         </header>
 
         <!-- PERMANENT LOGIN PANEL ON THE SIDE -->
-        <div class="login-panel" id="loginPanelContainer">
-            <!-- Dynamic Content (Will show either input form or logged-in status) -->
-        </div>
+        <div class="login-panel" id="loginPanelContainer"></div>
     </div>
 
     <!-- LOADING STATE -->
@@ -629,6 +662,19 @@
             <button class="close-btn" id="closeModalBtn">✕</button>
         </div>
         <div class="modal-body" id="modalChartBody"></div>
+    </div>
+</div>
+
+<!-- Professional Analytics Modal (Replaces old local prompt/alert) -->
+<div class="modal-overlay" id="analyticsModal">
+    <div class="modal-card">
+        <div class="modal-header">
+            <h3>📊 Visitor Analytics Panel</h3>
+            <button class="close-btn" id="closeAnalyticsBtn">✕</button>
+        </div>
+        <div class="modal-body" id="analyticsModalBody">
+            <!-- Dynamic Content: Password Form or Stats Data -->
+        </div>
     </div>
 </div>
 
@@ -680,7 +726,7 @@
                 if (!val) val = "Anonymous Guest";
                 localStorage.setItem('eSports_GuestName', val);
                 logVisitorData(val);
-                initLoginSystem(); // Re-render panel
+                initLoginSystem();
             };
 
             document.getElementById('panelNameInput').onkeydown = (e) => {
@@ -730,24 +776,21 @@
             deviceName = "Other Device";
         }
 
-        // 1. Total Count Increment
         const visitorRef = ref(db, 'stats/totalVisits');
         runTransaction(visitorRef, (currentVisits) => {
             return (currentVisits || 0) + 1;
         });
 
-        // 2. Save Device and Guest Name Log to Firebase Database
         const devicesRef = ref(db, 'stats/visitorDevices');
         push(devicesRef, {
             name: guestName,
             device: deviceName,
-            time: new Date().toLocaleString()
+            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
         });
     }
 
     window.addEventListener('DOMContentLoaded', () => {
         initLoginSystem();
-        // Agar pehle se logged in hai toh check karein ke session mein pehli bar visit log hua ya nahi
         let savedName = localStorage.getItem('eSports_GuestName');
         if (savedName && !sessionStorage.getItem('logged_this_session')) {
             logVisitorData(savedName);
@@ -755,27 +798,69 @@
         }
     });
 
-    // --- SECRET VIEW SHORTCUT (Ctrl + Shift + A -> Password: Ali 123) ---
-    async function checkVisitorDevice() {
-        const pwd = prompt("🔒 Enter Secret Password for Visitor Analytics:");
+    // --- PROFESSIONAL ANALYTICS MODAL SYSTEM ---
+    const analyticsModal = document.getElementById('analyticsModal');
+    const analyticsModalBody = document.getElementById('analyticsModalBody');
+    document.getElementById('closeAnalyticsBtn').onclick = () => analyticsModal.classList.remove('active');
+
+    function openAnalyticsPasswordPrompt() {
+        analyticsModalBody.innerHTML = `
+            <div class="admin-login-box">
+                <p style="font-size: 0.75rem; color: var(--text-secondary);">Yeh area secure hai. Visitor analytics dekhne ke liye password enter karein:</p>
+                <input type="password" id="analyticsPwdInput" class="login-input" placeholder="Enter password (Ali 123)..." autocomplete="off">
+                <button class="login-btn" id="analyticsSubmitBtn" style="width: 100%; margin-top: 5px;">Unlock Dashboard 🔓</button>
+            </div>
+        `;
+        analyticsModal.classList.add('active');
+
+        document.getElementById('analyticsSubmitBtn').onclick = verifyAnalyticsPassword;
+        document.getElementById('analyticsPwdInput').onkeydown = (e) => {
+            if (e.key === 'Enter') verifyAnalyticsPassword();
+        };
+    }
+
+    async function verifyAnalyticsPassword() {
+        const pwd = document.getElementById('analyticsPwdInput').value;
         if (pwd === "Ali 123") {
+            analyticsModalBody.innerHTML = `<div style="text-align: center; padding: 2rem;"><div class="spinner" style="margin: 0 auto;"></div><p style="font-size:0.75rem; color:var(--text-secondary); margin-top:10px;">Loading live analytics...</p></div>`;
+            
             const visitsSnap = await get(ref(db, 'stats/totalVisits'));
             const devicesSnap = await get(ref(db, 'stats/visitorDevices'));
             
             const totalVisits = visitsSnap.exists() ? visitsSnap.val() : 0;
-            let deviceListText = "";
+            let visitorHtmlList = "";
 
             if (devicesSnap.exists()) {
                 const devicesData = devicesSnap.val();
-                let entries = Object.values(devicesData).reverse(); // Latest first
-                let recentEntries = entries.slice(0, 10); // Last 10 visitors
-                recentEntries.forEach((item, index) => {
-                    deviceListText += `\n${index + 1}. Name: ${item.name} | Device: ${item.device} (${item.time})`;
+                let entries = Object.values(devicesData).reverse().slice(0, 8); // Last 8 visitors
+                entries.forEach((item) => {
+                    visitorHtmlList += `
+                        <div class="visitor-item">
+                            <div>
+                                <strong>👤 ${item.name}</strong>
+                                <span style="display: block;">📱 ${item.device}</span>
+                            </div>
+                            <span>🕒 ${item.time}</span>
+                        </div>
+                    `;
                 });
+            } else {
+                visitorHtmlList = `<p style="font-size: 0.7rem; color: var(--text-muted); text-align: center;">No visitor history found yet.</p>`;
             }
 
-            alert(`📊 TOTAL VISITS: ${totalVisits}\n\n📱 RECENT GUEST USERS & DEVICES:${deviceListText}\n\n(Yeh info sirf aapko secret shortcut se nazar aa rahi hai)`);
-        } else if (pwd !== null) {
+            analyticsModalBody.innerHTML = `
+                <div class="analytics-stats-box">
+                    <div class="stat-banner">
+                        <span>Total Website Visits</span>
+                        <strong>${totalVisits}</strong>
+                    </div>
+                    <div style="font-size: 0.7rem; font-weight: 800; color: var(--text-secondary); text-transform: uppercase; margin-top: 4px;">Recent Logged Visitors:</div>
+                    <div style="display: flex; flex-direction: column; gap: 6px; max-height: 220px; overflow-y: auto;">
+                        ${visitorHtmlList}
+                    </div>
+                </div>
+            `;
+        } else {
             alert("❌ Incorrect Password!");
         }
     }
@@ -783,7 +868,7 @@
     window.addEventListener('keydown', (e) => {
         if (e.ctrlKey && e.shiftKey && (e.key === 'A' || e.key === 'a' || e.code === 'KeyA')) {
             e.preventDefault();
-            checkVisitorDevice();
+            openAnalyticsPasswordPrompt();
         }
     });
 
